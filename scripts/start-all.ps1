@@ -2,6 +2,11 @@
 # Distributed AI/ML Job Processing Platform - Local Dev Cluster Launcher (Windows)
 # ==============================================================================
 
+# Ensure script executes from project root regardless of where it is invoked
+if ($PSScriptRoot) {
+    Set-Location (Split-Path -Parent $PSScriptRoot)
+}
+
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host " Starting Distributed AI/ML Processing Cluster (Windows Local Mode)   " -ForegroundColor Cyan
 Write-Host "======================================================================" -ForegroundColor Cyan
@@ -24,12 +29,12 @@ Start-Sleep -Seconds 1
 
 # 4. Start Node.js Backend API
 Write-Host "[4/5] Starting Express Backend API (:5000)..." -ForegroundColor Yellow
-Start-Process npm -ArgumentList "start" -WorkingDirectory "backend" -NoNewWindow
+Start-Process cmd.exe -ArgumentList "/c npm start" -WorkingDirectory "backend" -NoNewWindow
 Start-Sleep -Seconds 2
 
 # 5. Start React Vite Frontend
 Write-Host "[5/5] Starting React Vite Dashboard (:5173)..." -ForegroundColor Yellow
-Start-Process npm -ArgumentList "run dev" -WorkingDirectory "frontend"
+Start-Process cmd.exe -ArgumentList "/c npm run dev" -WorkingDirectory "frontend"
 
 Write-Host ""
 Write-Host "======================================================================" -ForegroundColor Green

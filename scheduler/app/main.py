@@ -18,6 +18,7 @@ import psycopg
 import redis
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 import uvicorn
 
@@ -33,8 +34,6 @@ logger = logging.getLogger("SchedulerService")
 
 DB_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:1234@localhost:5432/distributed_ml")
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-
-app = FastAPI(title="Distributed ML Scheduler Service", version="1.0.0")
 
 class SchedulerEngine:
     def __init__(self):
@@ -277,9 +276,12 @@ class SchedulerEngine:
 
 scheduler_engine = SchedulerEngine()
 
-@app.on_event("startup")
-def on_startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     scheduler_engine.start()
+    yield
+
+app = FastAPI(title="Distributed ML Scheduler Service", version="1.0.0", lifespan=lifespan)
 
 @app.get("/health")
 def health_check():

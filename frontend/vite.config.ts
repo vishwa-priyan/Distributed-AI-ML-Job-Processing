@@ -12,7 +12,15 @@ export default defineConfig({
       },
       '/socket.io': {
         target: 'http://localhost:5000',
-        ws: true
+        ws: true,
+        configure: (proxy) => {
+          proxy.on('error', (err: any) => {
+            if (err.code === 'ECONNABORTED' || err.code === 'ECONNREFUSED' || err.code === 'ECONNRESET') {
+              return;
+            }
+            console.error('[vite socket proxy error]:', err);
+          });
+        }
       }
     }
   }
