@@ -39,3 +39,36 @@ export async function apiRequest<T = any>(
 
   return data;
 }
+
+export async function downloadFile(endpoint: string, fallbackFilename = 'result.csv'): Promise<void> {
+  const token = localStorage.getItem('distml_token');
+  const headers = new Headers();
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const url = `${API_BASE}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  const response = await fetch(url, { headers });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Download failed (HTTP ${response.status})`);
+  }
+
+  const disposition = response.headers.get('content-disposition');
+  let filename = fallbackFilename;
+  if (disposition && disposition.includes('filename=')) {
+    const match = disposition.match(/filename="?([^"]+)"?/);
+    if (match && match[1]) filename = match[1];
+  }
+
+  const blob = await response.blob();
+  const blobUrl = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(blobUrl);
+  document.body.removeChild(a);
+}

@@ -8,7 +8,7 @@ import {
   BarChart2,
   Table as TableIcon
 } from 'lucide-react';
-import { apiRequest } from '../api/client.ts';
+import { apiRequest, downloadFile } from '../api/client.ts';
 import { StatusBadge } from '../components/StatusBadge.tsx';
 
 export const ResultsPage: React.FC = () => {
@@ -17,6 +17,7 @@ export const ResultsPage: React.FC = () => {
   const [resultData, setResultData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchingResult, setFetchingResult] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     apiRequest('/jobs?status=COMPLETED')
@@ -99,13 +100,23 @@ export const ResultsPage: React.FC = () => {
                   <h3 className="font-bold text-base text-white">Aggregated Result Artifact</h3>
                   <p className="text-xs text-slate-400 font-mono mt-0.5">{resultData.result_path}</p>
                 </div>
-                <a
-                  href={`/api/v1/jobs/${selectedJobId}/artifacts`}
-                  download
-                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-semibold rounded-lg text-xs transition-colors flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+                <button
+                  onClick={async () => {
+                    if (!selectedJobId) return;
+                    try {
+                      setDownloading(true);
+                      await downloadFile(`/jobs/${selectedJobId}/artifacts`, `job_${selectedJobId}_artifact.csv`);
+                    } catch (err: any) {
+                      alert(err.message || 'Failed to download artifact.');
+                    } finally {
+                      setDownloading(false);
+                    }
+                  }}
+                  disabled={downloading}
+                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-semibold rounded-lg text-xs transition-colors flex items-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50"
                 >
-                  <Download className="w-4 h-4" /> Download Artifact
-                </a>
+                  <Download className="w-4 h-4" /> {downloading ? 'Downloading...' : 'Download Artifact'}
+                </button>
               </div>
 
               {/* Evaluation Metrics JSON Card */}

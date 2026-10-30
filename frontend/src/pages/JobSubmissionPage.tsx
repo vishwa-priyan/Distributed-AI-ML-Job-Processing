@@ -37,18 +37,58 @@ export const JobSubmissionPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const matchModelForDataset = (datasetId: string, availableModels: any[]) => {
+    const datasetToKeyword: Record<string, string> = {
+      customer_churn: 'churn',
+      housing_prices: 'housing',
+      credit_risk: 'credit',
+      evaluation_test: 'churn'
+    };
+    const keyword = datasetToKeyword[datasetId];
+    if (keyword && availableModels.length > 0) {
+      const match = availableModels.find(m => 
+        (m.model_name || '').toLowerCase().includes(keyword) || 
+        (m.model_path || '').toLowerCase().includes(keyword)
+      );
+      if (match) {
+        setSelectedModelId(match.id);
+      }
+    }
+  };
+
   useEffect(() => {
     // Load models
     apiRequest('/models')
       .then((res) => {
-        setModels(res.data);
-        if (res.data.length > 0) setSelectedModelId(res.data[0].id);
+        const loadedModels = res.data || [];
+        setModels(loadedModels);
+        matchModelForDataset('customer_churn', loadedModels);
       })
       .catch(() => {});
 
     // Set sample preview
     loadSamplePreview('customer_churn');
   }, []);
+
+  const handleDatasetSelect = (datasetId: string) => {
+    setSampleDataset(datasetId);
+    loadSamplePreview(datasetId);
+    matchModelForDataset(datasetId, models);
+
+    if (datasetId === 'customer_churn') {
+      setName('Customer Churn Distributed Inference');
+      setDescription('Parallel batch inference with intelligent worker dispatch');
+    } else if (datasetId === 'credit_risk') {
+      setName('Credit Risk Assessor Inference');
+      setDescription('Credit score and loan default assessment batch workload');
+    } else if (datasetId === 'housing_prices') {
+      setName('Housing Price Valuation Prediction');
+      setDescription('Distributed regression inference for housing valuation data');
+    } else if (datasetId === 'evaluation_test') {
+      setName('Model Evaluation Holdout Validation');
+      setDescription('Ground truth validation split model benchmark');
+    }
+  };
 
   const loadSamplePreview = (key: string) => {
     if (key === 'customer_churn') {
@@ -59,6 +99,16 @@ export const JobSubmissionPage: React.FC = () => {
           ['15', '104.09', '1575.74', '0', '2', '1'],
           ['61', '23.84', '1371.66', '0', '2', '0'],
           ['21', '110.18', '2265.70', '0', '1', '1']
+        ]
+      });
+    } else if (key === 'credit_risk') {
+      setPreviewData({
+        headers: ['age', 'annual_income', 'credit_score', 'debt_to_income', 'loan_amount', 'defaulted'],
+        rows: [
+          ['35', '75000', '710', '0.28', '15000', '0'],
+          ['48', '42000', '580', '0.45', '25000', '1'],
+          ['29', '95000', '760', '0.18', '12000', '0'],
+          ['54', '31000', '520', '0.52', '18000', '1']
         ]
       });
     } else if (key === 'housing_prices') {
@@ -92,9 +142,20 @@ export const JobSubmissionPage: React.FC = () => {
         if (text) {
           const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
           if (lines.length > 0) {
-            const headers = lines[0].split(',');
-            const rows = lines.slice(1, 5).map(l => l.split(','));
+            const headers = lines[0].split(',').map(h => h.trim());
+            const rows = lines.slice(1, 5).map(l => l.split(',').map(c => c.trim()));
             setPreviewData({ headers, rows });
+
+            // Attempt to auto-suggest model based on headers
+            for (const m of models) {
+              if (Array.isArray(m.input_features_json) && m.input_features_json.length > 0) {
+                const matches = m.input_features_json.every((feat: string) => headers.includes(feat));
+                if (matches) {
+                  setSelectedModelId(m.id);
+                  break;
+                }
+              }
+            }
           }
         }
       };
@@ -245,18 +306,16 @@ export const JobSubmissionPage: React.FC = () => {
           </div>
 
           {datasetMode === 'sample' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {[
                 { id: 'customer_churn', name: 'Customer Churn (2,000 Rows)', desc: 'Classification: tenure, charges, contract' },
+                { id: 'credit_risk', name: 'Credit Risk (1,500 Rows)', desc: 'Classification: age, income, credit score, loan' },
                 { id: 'housing_prices', name: 'Housing Prices (2,000 Rows)', desc: 'Regression: sqft, bedrooms, year built' },
                 { id: 'evaluation_test', name: 'Evaluation Holdout (300 Rows)', desc: 'Ground truth validation split' }
               ].map((item) => (
                 <div
                   key={item.id}
-                  onClick={() => {
-                    setSampleDataset(item.id);
-                    loadSamplePreview(item.id);
-                  }}
+                  onClick={() => handleDatasetSelect(item.id)}
                   className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
                     sampleDataset === item.id
                       ? 'bg-emerald-500/10 border-emerald-500/50 text-white shadow-md shadow-emerald-500/10'
@@ -310,11 +369,52 @@ export const JobSubmissionPage: React.FC = () => {
           )}
         </div>
 
-        {/* Section 3: Scheduling Strategy & Batching */}
+        {/* Section 3: Machine Learning Model Selection */}
+        {(jobType === 'csv_batch_inference' || jobType === 'model_evaluation') && (
+          <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                3. Pre-Trained Machine Learning Model
+              </h2>
+              <span className="text-[11px] text-slate-400">
+                Ensure selected model features match dataset
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {models.map((m) => {
+                const isSelected = selectedModelId === m.id;
+                return (
+                  <div
+                    key={m.id}
+                    onClick={() => setSelectedModelId(m.id)}
+                    className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                      isSelected
+                        ? 'bg-amber-500/10 border-amber-500/50 text-white shadow-md shadow-amber-500/10'
+                        : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold text-xs text-white">{m.model_name}</p>
+                      {isSelected && <CheckCircle2 className="w-4 h-4 text-amber-400" />}
+                    </div>
+                    <p className="text-[10px] text-amber-400/90 font-mono mt-0.5">{m.model_type}</p>
+                    <p className="text-[10px] text-slate-400 mt-2 font-mono bg-slate-950/60 p-2 rounded border border-slate-800/80 line-clamp-2">
+                      Features: {Array.isArray(m.input_features_json) ? m.input_features_json.join(', ') : 'All columns'}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Section 4: Scheduling Strategy & Batching */}
         <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
           <h2 className="text-sm font-semibold text-white flex items-center gap-2">
             <Cpu className="w-4 h-4 text-purple-400" />
-            3. Intelligent Scheduling Strategy & Execution Options
+            4. Intelligent Scheduling Strategy & Execution Options
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">

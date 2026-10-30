@@ -14,7 +14,7 @@ import {
   Layers
 } from 'lucide-react';
 import { StatusBadge } from '../components/StatusBadge.tsx';
-import { apiRequest } from '../api/client.ts';
+import { apiRequest, downloadFile } from '../api/client.ts';
 import { useSocket } from '../context/SocketContext.tsx';
 
 export const JobDetailsPage: React.FC = () => {
@@ -22,6 +22,7 @@ export const JobDetailsPage: React.FC = () => {
   const [jobData, setJobData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
   const { socket } = useSocket();
 
   const fetchJobDetails = async () => {
@@ -89,15 +90,24 @@ export const JobDetailsPage: React.FC = () => {
           </p>
         </div>
 
-        {job.status === 'COMPLETED' && artifacts && artifacts.length > 0 && (
-          <a
-            href={`/api/v1/jobs/${job.id}/artifacts`}
-            download
-            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-semibold rounded-lg text-xs transition-colors flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+        {job.status === 'COMPLETED' && (
+          <button
+            onClick={async () => {
+              try {
+                setDownloading(true);
+                await downloadFile(`/jobs/${job.id}/artifacts`, `job_${job.id}_artifact.csv`);
+              } catch (err: any) {
+                alert(err.message || 'Failed to download artifact.');
+              } finally {
+                setDownloading(false);
+              }
+            }}
+            disabled={downloading}
+            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-semibold rounded-lg text-xs transition-colors flex items-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50"
           >
             <Download className="w-4 h-4" />
-            Download Final Artifact
-          </a>
+            {downloading ? 'Downloading...' : 'Download Final Artifact'}
+          </button>
         )}
       </div>
 

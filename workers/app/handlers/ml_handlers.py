@@ -52,9 +52,20 @@ class MLHandlerRegistry:
 
         model = joblib.load(model_path)
         
-        # Prepare features: exclude non-feature columns
-        feature_cols = [c for c in df.columns if c not in ['id', 'label', 'target', 'churn', 'price', 'defaulted']]
-        X = df[feature_cols]
+        # Prepare features: align to model's expected features if available
+        if hasattr(model, 'feature_names_in_') and model.feature_names_in_ is not None:
+            expected_cols = list(model.feature_names_in_)
+            missing_cols = [c for c in expected_cols if c not in df.columns]
+            if missing_cols:
+                raise ValueError(
+                    f"Feature mismatch for model {os.path.basename(model_path)}. "
+                    f"Required features missing: {missing_cols}. "
+                    f"Dataset features: {list(df.columns)}"
+                )
+            X = df[expected_cols]
+        else:
+            feature_cols = [c for c in df.columns if c not in ['id', 'label', 'target', 'churn', 'price', 'defaulted']]
+            X = df[feature_cols]
 
         t0 = time.time()
         preds = model.predict(X)
@@ -150,10 +161,22 @@ class MLHandlerRegistry:
             target_col = df.columns[-1]
 
         y_true = df[target_col]
-        feature_cols = [c for c in df.columns if c not in [target_col, 'id']]
-        X = df[feature_cols]
-
         model = joblib.load(model_path)
+
+        if hasattr(model, 'feature_names_in_') and model.feature_names_in_ is not None:
+            expected_cols = list(model.feature_names_in_)
+            missing_cols = [c for c in expected_cols if c not in df.columns]
+            if missing_cols:
+                raise ValueError(
+                    f"Feature mismatch for model {os.path.basename(model_path)}. "
+                    f"Required features missing: {missing_cols}. "
+                    f"Dataset features: {list(df.columns)}"
+                )
+            X = df[expected_cols]
+        else:
+            feature_cols = [c for c in df.columns if c not in [target_col, 'id']]
+            X = df[feature_cols]
+
         y_pred = model.predict(X)
 
         # Classification vs Regression check

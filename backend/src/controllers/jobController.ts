@@ -51,21 +51,66 @@ export async function createJob(req: Request, res: Response, next: NextFunction)
 
     // Map model selection if provided
     let modelPath = data.model_path || '';
+    let selectedModelRecord: any = null;
+
     if (!modelPath && data.model_id) {
-      const modelRes = await query('SELECT model_path FROM model_registry WHERE id = $1', [data.model_id]);
+      const modelRes = await query(
+        'SELECT id, model_name, model_type, model_path, input_features_json FROM model_registry WHERE id = $1',
+        [data.model_id]
+      );
       if (modelRes.rows.length > 0) {
-        modelPath = modelRes.rows[0].model_path;
+        selectedModelRecord = modelRes.rows[0];
+        modelPath = selectedModelRecord.model_path;
       }
     }
+
     if (!modelPath) {
-      if (data.job_type === 'csv_batch_inference') {
-        modelPath = 'ml/models/customer_churn_rf.joblib';
-      } else if (data.job_type === 'model_evaluation') {
+      const sampleModelMap: Record<string, string> = {
+        'customer_churn': 'ml/models/customer_churn_rf.joblib',
+        'housing_prices': 'ml/models/housing_price_gbr.joblib',
+        'credit_risk': 'ml/models/credit_risk_lr.joblib',
+        'evaluation_test': 'ml/models/customer_churn_rf.joblib'
+      };
+      if (req.body.sample_dataset && sampleModelMap[req.body.sample_dataset]) {
+        modelPath = sampleModelMap[req.body.sample_dataset];
+      } else if (data.job_type === 'csv_batch_inference' || data.job_type === 'model_evaluation') {
         modelPath = 'ml/models/customer_churn_rf.joblib';
       }
     }
+
     if (modelPath) {
       modelPath = resolveProjectPath(modelPath);
+    }
+
+    // Validate feature compatibility for CSV batch inference or model evaluation
+    if (modelPath && (data.job_type === 'csv_batch_inference' || data.job_type === 'model_evaluation')) {
+      if (!selectedModelRecord) {
+        const normPath = modelPath.replace(/\\/g, '/');
+        const filename = normPath.split('/').pop();
+        const mRes = await query(
+          'SELECT id, model_name, model_type, model_path, input_features_json FROM model_registry WHERE model_path LIKE $1',
+          [`%${filename}`]
+        );
+        if (mRes.rows.length > 0) {
+          selectedModelRecord = mRes.rows[0];
+        }
+      }
+
+      if (selectedModelRecord && Array.isArray(selectedModelRecord.input_features_json) && selectedModelRecord.input_features_json.length > 0) {
+        const requiredFeatures: string[] = selectedModelRecord.input_features_json;
+        if (fs.existsSync(datasetPath)) {
+          const firstLine = fs.readFileSync(datasetPath, 'utf8').split(/\r?\n/)[0];
+          const csvHeaders = firstLine.split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
+          const missingFeatures = requiredFeatures.filter(f => !csvHeaders.includes(f));
+          if (missingFeatures.length > 0) {
+            res.status(400).json({
+              success: false,
+              error: `Feature mismatch: Model '${selectedModelRecord.model_name}' requires features [${requiredFeatures.join(', ')}], but dataset has [${csvHeaders.join(', ')}]. Missing: [${missingFeatures.join(', ')}].`
+            });
+            return;
+          }
+        }
+      }
     }
 
     const parameters = {
@@ -386,9 +431,22 @@ export async function getJobResults(req: Request, res: Response, next: NextFunct
       return;
     }
 
-    const { result_path, job_type, status } = jobRes.rows[0];
+    let { result_path, job_type, status } = jobRes.rows[0];
 
-    if (status !== 'COMPLETED' || !result_path || !fs.existsSync(result_path)) {
+    // Fallback to result_artifacts if result_path is missing on job
+    if (!result_path) {
+      const artRes = await query(
+        'SELECT storage_path FROM result_artifacts WHERE job_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [jobId]
+      );
+      if (artRes.rows.length > 0) {
+        result_path = artRes.rows[0].storage_path;
+      }
+    }
+
+    const resolvedPath = result_path ? resolveProjectPath(result_path) : '';
+
+    if (status !== 'COMPLETED' || !resolvedPath || !fs.existsSync(resolvedPath)) {
       res.status(404).json({
         success: false,
         error: 'Results are not yet available or job has not completed.'
@@ -398,10 +456,10 @@ export async function getJobResults(req: Request, res: Response, next: NextFunct
 
     let parsedResult: any = null;
 
-    if (result_path.endsWith('.json')) {
-      parsedResult = JSON.parse(fs.readFileSync(result_path, 'utf-8'));
-    } else if (result_path.endsWith('.csv')) {
-      const content = fs.readFileSync(result_path, 'utf-8');
+    if (resolvedPath.endsWith('.json')) {
+      parsedResult = JSON.parse(fs.readFileSync(resolvedPath, 'utf-8'));
+    } else if (resolvedPath.endsWith('.csv')) {
+      const content = fs.readFileSync(resolvedPath, 'utf-8');
       const lines = content.split(/\r?\n/).filter(l => l.trim().length > 0);
       const headers = lines[0].split(',');
       const previewRows = lines.slice(1, 21).map(l => l.split(','));
@@ -418,7 +476,7 @@ export async function getJobResults(req: Request, res: Response, next: NextFunct
       data: {
         job_id: jobId,
         job_type,
-        result_path,
+        result_path: resolvedPath,
         preview: parsedResult
       }
     });
@@ -437,14 +495,31 @@ export async function downloadArtifact(req: Request, res: Response, next: NextFu
       return;
     }
 
-    const resultPath = jobRes.rows[0].result_path;
-    if (!resultPath || !fs.existsSync(resultPath)) {
+    let resultPath = jobRes.rows[0].result_path;
+    if (!resultPath) {
+      const artRes = await query(
+        'SELECT storage_path FROM result_artifacts WHERE job_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [jobId]
+      );
+      if (artRes.rows.length > 0) {
+        resultPath = artRes.rows[0].storage_path;
+      }
+    }
+
+    if (!resultPath) {
+      res.status(404).json({ success: false, error: 'Result artifact file not found for this job.' });
+      return;
+    }
+
+    const resolvedPath = resolveProjectPath(resultPath);
+    if (!fs.existsSync(resolvedPath)) {
       res.status(404).json({ success: false, error: 'Result artifact file not found on disk.' });
       return;
     }
 
-    const filename = path.basename(resultPath);
-    res.download(path.resolve(resultPath), filename);
+    const filename = path.basename(resolvedPath);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.download(resolvedPath, filename);
   } catch (err) {
     next(err);
   }
