@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0",
+  "created_at": "2026-10-30T13:57:16.636004+00:00",
+  "model_architecture": "HistGradientBoostingRegressor",
+  "feature_schema": [
+    "job_type_code",
+    "record_count",
+    "batch_size",
+    "worker_cpu_cores",
+    "worker_total_ram_mb",
+    "active_tasks",
+    "current_cpu_pct"
+  ],
+  "evaluation_metrics": {
+    "baseline_mae": 17.6842,
+    "baseline_rmse": 28.0272,
+    "candidate_mae": 1.3358,
+    "candidate_rmse": 3.1575,
+    "r2_score": 0.9873
+  }
+}

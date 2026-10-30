@@ -1,0 +1,5 @@
+job_id,strategy,total_batches,total_records,wall_clock_sec,avg_sched_latency_ms,throughput_records_per_sec,workers_count,t1_baseline_sec,speedup_s_n,efficiency_pct
+91a429df-13f5-4c0a-ac26-2af39642c7df,round_robin,4,2000,5.286,79.81,378.36,2,2.118,0.401,20.1
+e1fd3b29-4816-42a6-b6c1-9ab6aebc90b1,least_loaded,4,2000,3.701,50.18,540.36,2,2.118,0.572,28.6
+ed9dfda4-5183-4756-956c-c83a1db146d6,resource_aware,4,2000,3.705,52.39,539.84,2,2.118,0.572,28.6
+fa5923f8-37ea-40ec-be31-754bc8912c49,predictive,4,2000,4.235,122.78,472.26,2,2.118,0.5,25.0

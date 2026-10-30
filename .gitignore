@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Database & Runtime Data
+postgres-data/
+redis-data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads and Artifacts storage
+storage/uploads/*
+!storage/uploads/.gitkeep
+storage/artifacts/*
+!storage/artifacts/.gitkeep
+storage/batches/*
+!storage/batches/.gitkeep
+
+# Logs & Metrics
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS Files
+.DS_Store
+Thumbs.db

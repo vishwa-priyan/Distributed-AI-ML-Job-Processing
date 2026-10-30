@@ -1,0 +1,54 @@
+[
+  {
+    "job_id": "91a429df-13f5-4c0a-ac26-2af39642c7df",
+    "strategy": "round_robin",
+    "total_batches": 4,
+    "total_records": 2000,
+    "wall_clock_sec": 5.286,
+    "avg_sched_latency_ms": 79.81,
+    "throughput_records_per_sec": 378.36,
+    "workers_count": 2,
+    "t1_baseline_sec": 2.118,
+    "speedup_s_n": 0.401,
+    "efficiency_pct": 20.1
+  },
+  {
+    "job_id": "e1fd3b29-4816-42a6-b6c1-9ab6aebc90b1",
+    "strategy": "least_loaded",
+    "total_batches": 4,
+    "total_records": 2000,
+    "wall_clock_sec": 3.701,
+    "avg_sched_latency_ms": 50.18,
+    "throughput_records_per_sec": 540.36,
+    "workers_count": 2,
+    "t1_baseline_sec": 2.118,
+    "speedup_s_n": 0.572,
+    "efficiency_pct": 28.6
+  },
+  {
+    "job_id": "ed9dfda4-5183-4756-956c-c83a1db146d6",
+    "strategy": "resource_aware",
+    "total_batches": 4,
+    "total_records": 2000,
+    "wall_clock_sec": 3.705,
+    "avg_sched_latency_ms": 52.39,
+    "throughput_records_per_sec": 539.84,
+    "workers_count": 2,
+    "t1_baseline_sec": 2.118,
+    "speedup_s_n": 0.572,
+    "efficiency_pct": 28.6
+  },
+  {
+    "job_id": "fa5923f8-37ea-40ec-be31-754bc8912c49",
+    "strategy": "predictive",
+    "total_batches": 4,
+    "total_records": 2000,
+    "wall_clock_sec": 4.235,
+    "avg_sched_latency_ms": 122.78,
+    "throughput_records_per_sec": 472.26,
+    "workers_count": 2,
+    "t1_baseline_sec": 2.118,
+    "speedup_s_n": 0.5,
+    "efficiency_pct": 25.0
+  }
+]

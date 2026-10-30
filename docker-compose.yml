@@ -1,0 +1,158 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: distml-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-1234}
+      POSTGRES_DB: ${DB_NAME:-distributed_ml}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./database/seed/seed_data.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d distributed_ml"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: distml-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: distml-backend
+    restart: unless-stopped
+    environment:
+      PORT: 5000
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:1234@postgres:5432/distributed_ml
+      REDIS_URL: redis://redis:6379/0
+      SCHEDULER_URL: http://scheduler:8000
+      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-min-32-chars-long}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-super-secret-refresh-key-min-32-chars}
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: scheduler/Dockerfile
+    container_name: distml-scheduler
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:1234@postgres:5432/distributed_ml
+      REDIS_URL: redis://redis:6379/0
+      SCHEDULER_PORT: 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./storage:/app/storage
+      - ./ml/models:/app/ml/models
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker-alpha:
+    build:
+      context: .
+      dockerfile: workers/Dockerfile
+    container_name: distml-worker-alpha
+    restart: unless-stopped
+    environment:
+      WORKER_ID: worker-cpu-01
+      DATABASE_URL: postgresql://postgres:1234@postgres:5432/distributed_ml
+      REDIS_URL: redis://redis:6379/0
+    command: ["python", "workers/app/worker_service.py", "worker-cpu-01", "Node-Worker-Alpha"]
+    volumes:
+      - ./storage:/app/storage
+      - ./ml/models:/app/ml/models
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker-beta:
+    build:
+      context: .
+      dockerfile: workers/Dockerfile
+    container_name: distml-worker-beta
+    restart: unless-stopped
+    environment:
+      WORKER_ID: worker-cpu-02
+      DATABASE_URL: postgresql://postgres:1234@postgres:5432/distributed_ml
+      REDIS_URL: redis://redis:6379/0
+    command: ["python", "workers/app/worker_service.py", "worker-cpu-02", "Node-Worker-Beta"]
+    volumes:
+      - ./storage:/app/storage
+      - ./ml/models:/app/ml/models
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: distml-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: distml-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: distml-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres_data:
+  redis_data:
