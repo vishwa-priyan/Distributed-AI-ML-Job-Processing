@@ -21,6 +21,16 @@ def resolve_file_path(p: str) -> str:
     if os.path.exists(p):
         return p
     base = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+
+    # If path is an absolute path from another machine, extract relative 'storage/' or 'ml/'
+    norm_p = p.replace('\\', '/')
+    for root_dir in ['storage/', 'ml/']:
+        if root_dir in norm_p:
+            rel = norm_p[norm_p.index(root_dir):]
+            candidate = os.path.join(base, rel.replace('/', os.sep))
+            if os.path.exists(candidate):
+                return candidate
+
     alt = os.path.join(base, p)
     if os.path.exists(alt):
         return alt
@@ -28,7 +38,7 @@ def resolve_file_path(p: str) -> str:
     alt2 = os.path.join(base, 'backend', p)
     if os.path.exists(alt2):
         return alt2
-    return p
+    return alt
 
 class MLHandlerRegistry:
     @staticmethod

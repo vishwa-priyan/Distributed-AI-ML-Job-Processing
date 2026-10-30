@@ -22,10 +22,10 @@ def is_port_in_use(port: int, host: str = '127.0.0.1') -> bool:
         return s.connect_ex((host, port)) == 0
 
 def main():
-    port = 6379
-    host = '127.0.0.1'
+    port = int(os.environ.get('REDIS_PORT', 6379))
+    host = os.environ.get('REDIS_HOST', '0.0.0.0')
 
-    if is_port_in_use(port, host):
+    if is_port_in_use(port, '127.0.0.1'):
         logger.info(f"Port {port} is already in use by an active Redis service. Monitoring existing Redis...")
         try:
             while True:
@@ -36,7 +36,7 @@ def main():
 
     try:
         import fakeredis
-        logger.info(f"Starting standalone Redis TCP Server on {host}:{port}...")
+        logger.info(f"Starting standalone Redis TCP Server on {host}:{port} (LAN accessible)...")
         server = fakeredis.TcpFakeServer((host, port))
         
         def handle_exit(signum, frame):

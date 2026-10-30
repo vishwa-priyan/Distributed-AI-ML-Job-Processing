@@ -53,6 +53,8 @@ export async function partitionAndCreateTasks(
 
       const chunkFileName = `${jobId}_batch_${i}.csv`;
       const chunkFilePath = path.join(env.STORAGE_BATCHES_DIR, chunkFileName);
+      const relChunkPath = `storage/batches/${chunkFileName}`;
+      const relResultPath = `storage/batches/${jobId}_batch_${i}_result.csv`;
       
       const chunkContent = [header, ...chunkRows].join('\n');
       fs.writeFileSync(chunkFilePath, chunkContent, 'utf-8');
@@ -62,7 +64,7 @@ export async function partitionAndCreateTasks(
         `INSERT INTO job_batches (job_id, batch_index, total_batches, record_start_index, record_count, status, chunk_path)
          VALUES ($1, $2, $3, $4, $5, 'QUEUED', $6)
          RETURNING id`,
-        [jobId, i, totalBatches, startIndex, chunkCount, chunkFilePath]
+        [jobId, i, totalBatches, startIndex, chunkCount, relChunkPath]
       );
       const batchId = batchRes.rows[0].id;
 
@@ -74,8 +76,8 @@ export async function partitionAndCreateTasks(
           jobId,
           batchId,
           jobType,
-          chunkFilePath,
-          path.join(env.STORAGE_BATCHES_DIR, `${jobId}_batch_${i}_result.csv`)
+          relChunkPath,
+          relResultPath
         ]
       );
     }
