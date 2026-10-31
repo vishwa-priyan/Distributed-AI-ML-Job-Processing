@@ -6,6 +6,7 @@ If port 6379 is already open (e.g. running external Redis container or service),
 """
 
 import sys
+import os
 import socket
 import logging
 import signal
