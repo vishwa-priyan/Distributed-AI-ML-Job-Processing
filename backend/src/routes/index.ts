@@ -29,10 +29,15 @@ router.get('/internal/storage/:category/:filename', (req, res) => {
     targetDir = path.resolve(__dirname, '../../../ml/sample_data');
   }
 
-  const filePath = path.join(targetDir, safeFilename);
+  let filePath = path.join(targetDir, safeFilename);
   if (!fs.existsSync(filePath)) {
-    res.status(404).json({ success: false, error: `File not found in ${category}: ${safeFilename}` });
-    return;
+    const fallbackPath = path.resolve(__dirname, '../../storage', category, safeFilename);
+    if (fs.existsSync(fallbackPath)) {
+      filePath = fallbackPath;
+    } else {
+      res.status(404).json({ success: false, error: `File not found in ${category}: ${safeFilename}` });
+      return;
+    }
   }
   res.sendFile(filePath);
 });

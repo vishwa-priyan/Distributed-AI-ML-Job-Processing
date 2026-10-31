@@ -6,6 +6,13 @@ import { z } from 'zod';
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 dotenv.config();
 
+function resolveStoragePath(val: string | undefined, defaultRel: string): string {
+  const projectRoot = path.resolve(__dirname, '../../../');
+  if (!val) return path.resolve(projectRoot, defaultRel);
+  if (path.isAbsolute(val)) return val;
+  return path.resolve(projectRoot, val);
+}
+
 const envSchema = z.object({
   PORT: z.string().default('5000').transform(Number),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -21,9 +28,9 @@ const envSchema = z.object({
   REDIS_URL: z.string().default('redis://localhost:6379/0'),
 
   SCHEDULER_URL: z.string().default('http://localhost:8000'),
-  STORAGE_UPLOADS_DIR: z.string().default(path.resolve(__dirname, '../../../storage/uploads')),
-  STORAGE_ARTIFACTS_DIR: z.string().default(path.resolve(__dirname, '../../../storage/artifacts')),
-  STORAGE_BATCHES_DIR: z.string().default(path.resolve(__dirname, '../../../storage/batches')),
+  STORAGE_UPLOADS_DIR: z.string().optional().transform(v => resolveStoragePath(v, 'storage/uploads')),
+  STORAGE_ARTIFACTS_DIR: z.string().optional().transform(v => resolveStoragePath(v, 'storage/artifacts')),
+  STORAGE_BATCHES_DIR: z.string().optional().transform(v => resolveStoragePath(v, 'storage/batches')),
   MAX_UPLOAD_SIZE_BYTES: z.string().default('104857600').transform(Number)
 });
 

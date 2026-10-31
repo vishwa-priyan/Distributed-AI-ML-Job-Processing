@@ -19,37 +19,38 @@ def resolve_file_path(p: str, category: str = "batches") -> str:
     if not p:
         return p
     if os.path.exists(p) and os.path.getsize(p) > 0:
-        return p
-    base = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+        return os.path.abspath(p)
 
-    # If path is an absolute path from another machine, extract relative 'storage/' or 'ml/'
-    target_path = None
+    base = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
     norm_p = p.replace('\\', '/')
+
+    candidates = []
     for root_dir in ['storage/', 'ml/']:
         if root_dir in norm_p:
-            rel = norm_p[norm_p.index(root_dir):]
-            candidate = os.path.join(base, rel.replace('/', os.sep))
-            if os.path.exists(candidate) and os.path.getsize(candidate) > 0:
-                return candidate
-            target_path = candidate
+            rel = norm_p[norm_p.index(root_dir):].replace('/', os.sep)
+            candidates.append(os.path.join(base, rel))
+            candidates.append(os.path.join(base, 'backend', rel))
 
-    if not target_path:
-        alt = os.path.join(base, p)
-        if os.path.exists(alt) and os.path.getsize(alt) > 0:
-            return alt
-        # Also check backend/storage
-        alt2 = os.path.join(base, 'backend', p)
-        if os.path.exists(alt2) and os.path.getsize(alt2) > 0:
-            return alt2
-        target_path = alt
+    if not os.path.isabs(p):
+        candidates.append(os.path.join(base, p))
+        candidates.append(os.path.join(base, 'backend', p))
 
-    # If not found locally, auto-sync from master node over HTTP
+    for c in candidates:
+        if os.path.exists(c) and os.path.getsize(c) > 0:
+            return os.path.abspath(c)
+
+    target_path = candidates[0] if candidates else os.path.join(base, p if not os.path.isabs(p) else os.path.basename(p))
+
     try:
         from workers.app.network.sync import ensure_file_present
         det_cat = "models" if "models" in norm_p else category
-        return ensure_file_present(target_path, det_cat)
+        synced = ensure_file_present(target_path, det_cat)
+        if os.path.exists(synced) and os.path.getsize(synced) > 0:
+            return os.path.abspath(synced)
     except Exception:
-        return target_path
+        pass
+
+    return target_path
 
 class MLHandlerRegistry:
     @staticmethod
