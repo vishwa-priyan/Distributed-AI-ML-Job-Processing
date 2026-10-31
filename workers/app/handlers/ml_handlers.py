@@ -15,30 +15,41 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from workers.app.result_writer.atomic_writer import write_atomic_csv, write_atomic_json
 
-def resolve_file_path(p: str) -> str:
+def resolve_file_path(p: str, category: str = "batches") -> str:
     if not p:
         return p
-    if os.path.exists(p):
+    if os.path.exists(p) and os.path.getsize(p) > 0:
         return p
     base = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
 
     # If path is an absolute path from another machine, extract relative 'storage/' or 'ml/'
+    target_path = None
     norm_p = p.replace('\\', '/')
     for root_dir in ['storage/', 'ml/']:
         if root_dir in norm_p:
             rel = norm_p[norm_p.index(root_dir):]
             candidate = os.path.join(base, rel.replace('/', os.sep))
-            if os.path.exists(candidate):
+            if os.path.exists(candidate) and os.path.getsize(candidate) > 0:
                 return candidate
+            target_path = candidate
 
-    alt = os.path.join(base, p)
-    if os.path.exists(alt):
-        return alt
-    # Also check backend/storage
-    alt2 = os.path.join(base, 'backend', p)
-    if os.path.exists(alt2):
-        return alt2
-    return alt
+    if not target_path:
+        alt = os.path.join(base, p)
+        if os.path.exists(alt) and os.path.getsize(alt) > 0:
+            return alt
+        # Also check backend/storage
+        alt2 = os.path.join(base, 'backend', p)
+        if os.path.exists(alt2) and os.path.getsize(alt2) > 0:
+            return alt2
+        target_path = alt
+
+    # If not found locally, auto-sync from master node over HTTP
+    try:
+        from workers.app.network.sync import ensure_file_present
+        det_cat = "models" if "models" in norm_p else category
+        return ensure_file_present(target_path, det_cat)
+    except Exception:
+        return target_path
 
 class MLHandlerRegistry:
     @staticmethod

@@ -97,7 +97,16 @@ class TaskExecutor:
             avg_cpu = round((metrics_before['cpu_percent'] + metrics_after['cpu_percent']) / 2, 2)
             mem_used_mb = metrics_after['proc_memory_mb']
 
-            # 3. Mark task completed in database
+            # 3. If running as a remote worker, sync generated result file back to master
+            actual_output = result.get('output_path', output_path) if isinstance(result, dict) else output_path
+            if actual_output:
+                try:
+                    from workers.app.network.sync import sync_result_to_master
+                    sync_result_to_master(actual_output, "batches")
+                except Exception as sync_err:
+                    logger.warning(f"Could not sync output {actual_output} to master: {sync_err}")
+
+            # 4. Mark task completed in database
             self._record_task_success(
                 task_id=task_id,
                 job_id=job_id,

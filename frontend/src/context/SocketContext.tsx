@@ -13,9 +13,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    // When running Vite dev server locally on port 5173, connect directly to Express (:5000)
-    // to prevent Vite proxy WebSocket abort errors (ECONNABORTED)
-    const socketUrl = window.location.port === '5173' ? 'http://localhost:5000' : '/';
+    // When running Vite dev server on port 5173, connect directly to Express (:5000)
+    // on the same host (Machine 1) to prevent Vite proxy WebSocket abort errors
+    const socketUrl = window.location.port === '5173'
+      ? `${window.location.protocol}//${window.location.hostname}:5000`
+      : '/';
     const s = io(socketUrl, {
       transports: ['websocket', 'polling'],
       autoConnect: true

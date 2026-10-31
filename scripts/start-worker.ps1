@@ -12,6 +12,8 @@ if ($PSScriptRoot) {
 
 $env:DATABASE_URL = "postgresql://postgres:1234@$($MasterIP):5432/distributed_ml"
 $env:REDIS_URL = "redis://$($MasterIP):6379/0"
+$env:MASTER_HOST = "$MasterIP"
+$env:MASTER_API_PORT = "5000"
 
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host " Starting Remote Distributed Worker Node: $WorkerName" -ForegroundColor Cyan
